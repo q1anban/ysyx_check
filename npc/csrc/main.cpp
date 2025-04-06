@@ -1,33 +1,36 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <verilated.h>
-#include <verilated_fst_c.h>
+#include <nvboard.h>
 #include "Vexample.h"
+
+
+static TOP_NAME top;
+
+void single_cycle() {
+  top.clk = 0; top.eval();
+  top.clk = 1; top.eval();
+}
+
+void reset(int n) {
+  top.rst = 1;
+  while (n -- > 0) single_cycle();
+  top.rst = 0;
+}
+
+void nvboard_bind_all_pins(TOP_NAME* top);
+
+
 int main(int argc, char** argv) {
 
-  VerilatedContext* context = new VerilatedContext;
-  context->commandArgs(argc, argv);
-  context->traceEverOn(true);
-
-  VerilatedFstC* tfp = new VerilatedFstC;
-  Vexample* top = new Vexample(context);
-
-  top->trace(tfp, 99);
-  tfp->open("dump.fst");
-
-  for(int i = 0; i < 10; i++) {
-    top->a = rand()&1;
-    top->b = rand()&1;
-    top->eval();
-    context->timeInc(1);
-    tfp->dump(context->time());
-    printf("a: %d, b: %d, c: %d\n", top->a, top->b, top->c);
+  
+  nvboard_bind_all_pins(&top);
+  nvboard_init();
+  reset(10);
+  while (1)
+  {
+    /* code */
+    single_cycle();
+    nvboard_update();
   }
-  tfp->close();
-
-  delete top;
-  delete tfp;
-  delete context;
-  printf("Hello, ysyx!\n");
+  
+  
   return 0;
 }
