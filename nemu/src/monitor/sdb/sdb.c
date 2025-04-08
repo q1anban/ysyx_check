@@ -17,6 +17,7 @@
 #include <cpu/cpu.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <memory/paddr.h>
 #include "sdb.h"
 
 static int is_batch_mode = false;
@@ -49,7 +50,49 @@ static int cmd_c(char *args) {
 
 
 static int cmd_q(char *args) {
+  nemu_state.state = NEMU_QUIT;
   return -1;
+}
+
+static int cmd_x(char *args) {//only support const
+  uint32_t addr, n;
+  if (sscanf(args, "%d %x", &n, &addr) != 2) {
+    printf("Invalid arguments: %s\n", args);
+    return 1;
+  }
+  for (int i = 0; i < n; i++) {
+    printf("0x%08x:0x%08x\n", addr + i * 4,paddr_read(addr + i * 4, 4));
+  }
+  return 0;
+}
+
+static int cmd_si(char *args) {
+  int n = 1;
+  if (args != NULL) {
+    sscanf(args, "%d", &n);
+    if (n <= 0) {
+      printf("Invalid argument: %s\n", args);
+      return 1;
+    }
+  }
+  cpu_exec(n);
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  if (args == NULL) {
+    printf("Usage: info [r|w]\n");
+    return 1;
+  }
+  
+  if (strcmp(args, "r") == 0) {
+    isa_reg_display();
+  } else if (strcmp(args, "w") == 0) {
+
+  } else {
+    printf("Unknown command '%s'\n", args);
+  }
+  return 0;
 }
 
 static int cmd_help(char *args);
@@ -62,7 +105,11 @@ static struct {
   { "help", "Display information about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-
+  { "si", "Execute one instruction (or N instructions) and stop", cmd_si },
+  {"info", "Show information about registers or watchpoints", cmd_info },
+  {"x", "Examine memory", cmd_x },
+  
+  
   /* TODO: Add more commands */
 
 };
@@ -119,7 +166,7 @@ void sdb_mainloop() {
 
 #ifdef CONFIG_DEVICE
     extern void sdl_clear_event_queue();
-    sdl_clear_event_queue();
+    sdl_clear_eventinit_monitorinit_monitor_queue();
 #endif
 
     int i;
