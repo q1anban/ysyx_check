@@ -145,7 +145,8 @@ void sdb_set_batch_mode() {
 
 void test_eval()
 {
-  FILE* test = fopen("tools/gen-expr/input", "r");
+  FILE* test = fopen("input", "r");
+  Assert(test != NULL, "Cannot open test file");
   char buf[1024];
   while (fgets(buf, sizeof(buf), test) != NULL) {
     bool success = true;
@@ -159,7 +160,7 @@ void test_eval()
     if (!success || result != reference) {
       printf("Error: %s\n", expr_str);
       printf("Expected: %u\n", reference);
-      printf("Got: %u\n", result);
+      Assert(0,"Got: %u\n", result);
     } 
   }
 }

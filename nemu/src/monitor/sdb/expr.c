@@ -175,18 +175,14 @@ static int check_parentheses(int start, int end) {
       balance++;
     else if (tokens[i].type == ')')
     {
-      if(balance==0)
+      balance=balance-1;
+      if(balance == 0)
       {
-        return 
+        return 0;
       }
     }
-      
-    if (balance < 0) {
-      Assert(0, "Unmatched parenthesis");
-      return 0;
-    }
   }
-  return balance == 0;
+  return balance>0;
 }
 
 word_t eval(int start,int end)
@@ -206,8 +202,9 @@ word_t eval(int start,int end)
   }
   int op = -1;
   int op_priority = 4;
+  int balance=0;
 
-  for (int i = start; i < end; i++) {
+  for (int i = start; i <= end; i++) {
     if (tokens[i].type == '+' || tokens[i].type == '-') {
       if (op_priority >= 1) {
         op = i;
@@ -221,14 +218,18 @@ word_t eval(int start,int end)
       }
     }else if(tokens[i].type == '(')
     {
-      while(tokens[i].type != ')')
+      balance++;
+      do
       {
-        Assert(i <=end, "No matching parenthesis");
         i++;
-      }
+        if(tokens[i].type == '(')
+          balance++;
+        else if(tokens[i].type == ')')
+          balance--;
+      }while(balance>0 && i <= end);
     }else if(tokens[i].type ==')')
     {
-      Assert(0, "Unmatched parenthesis");
+      Assert(0, "Unmatched parenthesis,start = %d, end = %d", start, end);  
     }
   }
   Assert(op != -1, "No operator found in expression,start = %d, end = %d", start, end);
