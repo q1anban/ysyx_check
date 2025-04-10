@@ -21,7 +21,10 @@
 #include <regex.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ,
+  TK_NOTYPE = 256, 
+  TK_EQ,
+  TK_DECIMAL,
+  TK_HEXADECIMAL,
 
   /* TODO: Add more token types */
 
@@ -38,6 +41,13 @@ static struct rule {
 
   {" +", TK_NOTYPE},    // spaces
   {"\\+", '+'},         // plus
+  {"-", '-'},          // minus
+  {"\\*", '*'},        // multiply
+  {"/", '/'},          // divide
+  {"\\(", '('},        // left parenthesis
+  {"\\)", ')'},        // right parenthesis
+  {"0[xX][0-9a-fA-F]+", TK_HEXADECIMAL}, // hex number
+  {"[0-9]+", TK_DECIMAL},     // decimal number
   {"==", TK_EQ},        // equal
 };
 
@@ -95,7 +105,18 @@ static bool make_token(char *e) {
          */
 
         switch (rules[i].token_type) {
-          default: TODO();
+          case TK_NOTYPE: break;
+          case TK_DECIMAL:
+          case TK_HEXADECIMAL:
+            tokens[nr_token].type = rules[i].token_type;
+            strncpy(tokens[nr_token].str, substr_start, substr_len);
+            tokens[nr_token].str[substr_len] = '\0';
+            nr_token++;
+            break;
+          default: 
+            tokens[nr_token].type = rules[i].token_type;
+            nr_token++;
+            break;
         }
 
         break;
@@ -111,6 +132,83 @@ static bool make_token(char *e) {
   return true;
 }
 
+static int check_parentheses(int start, int end) {
+  if (tokens[start].type != '(' || tokens[end].type != ')') {
+    return 0;
+  }
+
+  int balance = 1;
+  for (int i = start + 1; i < end; i++) {
+    if (tokens[i].type == '(') {
+      balance++;
+    }
+    else if (tokens[i].type == ')') {
+      balance--;
+      if (balance == 0 && i != end - 1) {
+        return 0;
+      }
+    }
+  }
+
+  return balance == 0 ? 1 : 0;
+}
+
+word_t eval(int start,int end)
+{
+  if (start > end) {
+    return 0;
+  }
+
+  if (start == end) {
+    Assert(tokens[start].type == TK_DECIMAL || tokens[start].type == TK_HEXADECIMAL,
+           "Invalid token type: %d", tokens[start].type);
+    return strtol(tokens[start].str, NULL, 0);
+  }
+
+  if (check_parentheses(start, end)) {
+    return eval(start + 1, end - 1);
+  }
+  int op = -1;
+  int op_priority = -1;
+
+  for (int i = start; i <= end; i++) {
+    if (tokens[i].type == '+' || tokens[i].type == '-') {
+      if (op_priority < 1) {
+        op = i;
+        op_priority = 1;
+      }
+    }
+    else if (tokens[i].type == '*' || tokens[i].type == '/') {
+      if (op_priority < 2) {
+        op = i;
+        op_priority = 2;
+      }
+    }else if(tokens[i].type == '(')
+    {
+      while(tokens[i++].type != ')')
+      {
+        Assert(i <= end, "No matching parenthesis");
+      }
+    }else if(tokens[i].type ==')')
+    {
+      Assert(0, "Unmatched parenthesis");
+    }
+  }
+  Assert(op != -1, "No operator found in expression");
+  int val1 = eval(start, op - 1);
+  int val2 = eval(op + 1, end);
+
+  switch (tokens[op].type) {
+    case '+': return val1 + val2;
+    case '-': return val1 - val2;
+    case '*': return val1 * val2;
+    case '/': 
+      Assert(val2 != 0, "Division by zero");
+      return val1 / val2;
+    default: assert(0);
+  }
+}
+
 
 word_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -119,7 +217,7 @@ word_t expr(char *e, bool *success) {
   }
 
   /* TODO: Insert codes to evaluate the expression. */
-  TODO();
-
-  return 0;
+  int result = eval(0, nr_token - 1);
+  *success = true;
+  return result;
 }

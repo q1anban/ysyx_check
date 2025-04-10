@@ -20,6 +20,8 @@
 #include <assert.h>
 #include <string.h>
 
+#define RANDNUM(x) (rand() % x)
+
 // this should be enough
 static char buf[65536] = {};
 static char code_buf[65536 + 128] = {}; // a little larger than `buf`
