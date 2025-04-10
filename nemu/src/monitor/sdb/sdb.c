@@ -143,7 +143,29 @@ void sdb_set_batch_mode() {
   is_batch_mode = true;
 }
 
+void test_eval()
+{
+  FILE* test = fopen("tools/gen-expr/input", "r");
+  char buf[1024];
+  while (fgets(buf, sizeof(buf), test) != NULL) {
+    bool success = true;
+    word_t reference ;
+    int i=0;
+    while(buf[i++]!=' ')
+      ;
+    sscanf(buf, "%u", &reference);
+    char* expr_str = buf + i;
+    word_t result = expr(expr_str, &success);
+    if (!success || result != reference) {
+      printf("Error: %s\n", expr_str);
+      printf("Expected: %u\n", reference);
+      printf("Got: %u\n", result);
+    } 
+  }
+}
+
 void sdb_mainloop() {
+  
   if (is_batch_mode) {
     cmd_c(NULL);
     return;

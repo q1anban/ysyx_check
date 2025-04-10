@@ -125,9 +125,42 @@ static bool make_token(char *e) {
 
     if (i == NR_REGEX) {
       printf("no match at position %d\n%s\n%*.s^\n", position, e, position, "");
+      //debug
+  for(int i = 0; i < nr_token; i++) {
+    switch(tokens[i].type) {
+      case TK_DECIMAL:
+        printf("%s", tokens[i].str);
+        break;
+      case TK_HEXADECIMAL:
+        printf("%s", tokens[i].str);
+        break;
+      case '+':
+        printf("+");
+        break;
+      case '-':
+        printf("-");
+        break;
+      case '*':
+        printf("*");
+        break;
+      case '/':
+        printf("/");
+        break;
+      case '(':
+        printf("(");
+        break;
+      case ')':
+        printf(")");
+        break;
+      case TK_EQ:
+        printf("==");
+        break;
+    }
+  }
       return false;
     }
   }
+  
 
   return true;
 }
@@ -136,21 +169,24 @@ static int check_parentheses(int start, int end) {
   if (tokens[start].type != '(' || tokens[end].type != ')') {
     return 0;
   }
-
   int balance = 1;
   for (int i = start + 1; i < end; i++) {
-    if (tokens[i].type == '(') {
+    if (tokens[i].type == '(') 
       balance++;
-    }
-    else if (tokens[i].type == ')') {
-      balance--;
-      if (balance == 0 && i != end - 1) {
-        return 0;
+    else if (tokens[i].type == ')')
+    {
+      if(balance==0)
+      {
+        return 
       }
     }
+      
+    if (balance < 0) {
+      Assert(0, "Unmatched parenthesis");
+      return 0;
+    }
   }
-
-  return balance == 0 ? 1 : 0;
+  return balance == 0;
 }
 
 word_t eval(int start,int end)
@@ -169,32 +205,33 @@ word_t eval(int start,int end)
     return eval(start + 1, end - 1);
   }
   int op = -1;
-  int op_priority = -1;
+  int op_priority = 4;
 
-  for (int i = start; i <= end; i++) {
+  for (int i = start; i < end; i++) {
     if (tokens[i].type == '+' || tokens[i].type == '-') {
-      if (op_priority < 1) {
+      if (op_priority >= 1) {
         op = i;
         op_priority = 1;
       }
     }
     else if (tokens[i].type == '*' || tokens[i].type == '/') {
-      if (op_priority < 2) {
+      if (op_priority >= 2) {
         op = i;
         op_priority = 2;
       }
     }else if(tokens[i].type == '(')
     {
-      while(tokens[i++].type != ')')
+      while(tokens[i].type != ')')
       {
-        Assert(i <= end, "No matching parenthesis");
+        Assert(i <=end, "No matching parenthesis");
+        i++;
       }
     }else if(tokens[i].type ==')')
     {
       Assert(0, "Unmatched parenthesis");
     }
   }
-  Assert(op != -1, "No operator found in expression");
+  Assert(op != -1, "No operator found in expression,start = %d, end = %d", start, end);
   int val1 = eval(start, op - 1);
   int val2 = eval(op + 1, end);
 
@@ -203,7 +240,7 @@ word_t eval(int start,int end)
     case '-': return val1 - val2;
     case '*': return val1 * val2;
     case '/': 
-      Assert(val2 != 0, "Division by zero");
+      Assert(val2 != 0, "Division by zero,start = %d, end = %d,val1 = %d, val2 = %d", start, end,val1, val2);
       return val1 / val2;
     default: assert(0);
   }
@@ -211,13 +248,10 @@ word_t eval(int start,int end)
 
 
 word_t expr(char *e, bool *success) {
-  if (!make_token(e)) {
-    *success = false;
-    return 0;
-  }
+  make_token(e);
 
   /* TODO: Insert codes to evaluate the expression. */
-  int result = eval(0, nr_token - 1);
+  word_t result = eval(0, nr_token - 1);
   *success = true;
   return result;
 }

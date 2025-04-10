@@ -20,7 +20,7 @@
 #include <assert.h>
 #include <string.h>
 
-#define RANDNUM(x) (rand() % x)
+#define RANDNUM(x) (rand() % (x))
 
 // this should be enough
 static char buf[65536] = {};
@@ -33,8 +33,69 @@ static char *code_format =
 "  return 0; "
 "}";
 
+
+
+static void gen_op()
+{
+  int seed = RANDNUM(4);
+  switch (seed) 
+  {
+    case 0:
+      strcat(buf, "+");
+      break;
+    case 1:
+      strcat(buf, "-");
+      break;
+    case 2:
+      strcat(buf, "*");
+      break;
+    case 3:
+      strcat(buf, "/");
+      break;
+  }
+}
+static void gen_num() {
+  int num = RANDNUM(1000000);
+  char num_buf[16];
+  sprintf(num_buf, "%d", num);
+  strcat(buf, num_buf);
+}
+
+static void gen_space() {
+  int blank = RANDNUM(3);
+  for(int i=0; i < blank; i++) {
+    strcat(buf, " ");
+  }
+}
+
+static void gen_expr(int depth, int parenthesis) {
+  if(depth > 3) {
+    gen_num();
+    return;
+  }
+  gen_space();
+  int seed = RANDNUM(3-parenthesis);
+  switch (seed) 
+  {
+    case 0:
+      gen_num();
+      break;
+    case 1:
+      gen_expr(depth + 1,0);
+      gen_op();
+      gen_expr(depth + 1,0);
+      break;
+    case 2:
+      strcat(buf, "(");
+      gen_expr(depth + 1,1);
+      strcat(buf, ")");
+      break;
+  }
+}
+
 static void gen_rand_expr() {
   buf[0] = '\0';
+  gen_expr(0,0);
 }
 
 int main(int argc, char *argv[]) {
@@ -55,8 +116,20 @@ int main(int argc, char *argv[]) {
     fputs(code_buf, fp);
     fclose(fp);
 
-    int ret = system("gcc /tmp/.code.c -o /tmp/.expr");
-    if (ret != 0) continue;
+    int ret = system("gcc /tmp/.code.c -o /tmp/.expr 2>/tmp/gcc_output.log");
+    if (ret != 0) {
+      continue;
+    }
+
+    FILE *log_fp = fopen("/tmp/gcc_output.log", "r");
+    assert(log_fp != NULL);
+    fseek(log_fp, 0, SEEK_END);
+    long log_size = ftell(log_fp);
+    fclose(log_fp);
+
+    if (log_size > 0) {
+      continue;
+    }
 
     fp = popen("/tmp/.expr", "r");
     assert(fp != NULL);
