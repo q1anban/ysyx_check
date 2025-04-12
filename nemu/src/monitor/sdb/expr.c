@@ -19,13 +19,18 @@
  * Type 'man regex' for more information about POSIX regex functions.
  */
 #include <regex.h>
+#define IS_BINARY_OP(type) ((type) == '+' || (type) == '-' || (type) == '*' || (type) == '/') 
 
 enum {
   TK_NOTYPE = 256, 
   TK_EQ,
   TK_DECIMAL,
   TK_HEXADECIMAL,
-
+  TK_NE,
+  TK_AND,
+  TK_REG,
+  TK_DEREF,
+  TK_NEG,
   /* TODO: Add more token types */
 
 };
@@ -41,14 +46,17 @@ static struct rule {
 
   {" +", TK_NOTYPE},    // spaces
   {"\\+", '+'},         // plus
-  {"-", '-'},          // minus
-  {"\\*", '*'},        // multiply
+  {"-", '-'},          // minus or negation
+  {"\\*", '*'},        // multiply or dereference
   {"/", '/'},          // divide
   {"\\(", '('},        // left parenthesis
   {"\\)", ')'},        // right parenthesis
   {"0[xX][0-9a-fA-F]+", TK_HEXADECIMAL}, // hex number
   {"[0-9]+", TK_DECIMAL},     // decimal number
   {"==", TK_EQ},        // equal
+  {"!=", TK_NE},
+  {"&&",TK_AND},
+  {"$[a-zA-Z_][a-zA-Z0-9_]*", TK_REG}, // register"}
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -108,10 +116,28 @@ static bool make_token(char *e) {
           case TK_NOTYPE: break;
           case TK_DECIMAL:
           case TK_HEXADECIMAL:
+          case TK_REG:
             tokens[nr_token].type = rules[i].token_type;
             strncpy(tokens[nr_token].str, substr_start, substr_len);
             tokens[nr_token].str[substr_len] = '\0';
             nr_token++;
+            break;
+          case '-':
+            if(nr_token == 0 || IS_BINARY_OP(tokens[nr_token - 1].type))
+            {
+              tokens[nr_token].type = TK_NEG;
+              nr_token++;
+            }
+
+
+
+
+            break;
+          case '*':
+
+
+
+
             break;
           default: 
             tokens[nr_token].type = rules[i].token_type;
@@ -204,6 +230,7 @@ word_t eval(int start,int end)
   int op_priority = 4;
   int balance=0;
 
+  // Find the main operator
   for (int i = start; i <= end; i++) {
     if (tokens[i].type == '+' || tokens[i].type == '-') {
       if (op_priority >= 1) {
