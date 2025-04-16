@@ -19,7 +19,11 @@
  * Type 'man regex' for more information about POSIX regex functions.
  */
 #include <regex.h>
-#define IS_BINARY_OP(type) ((type) == '+' || (type) == '-' || (type) == '*' || (type) == '/')
+#include <memory/vaddr.h>
+#define IS_BINARY_OP(type) ((type) == '+' || (type) == '-' || (type) == '*' || (type) == '/' || \
+                            (type) == TK_EQ || (type) == TK_NE || (type) == TK_AND)
+#define MAX_TOKEN_NUM 32
+#define MAX_PRIORITY 4
 
 enum
 {
@@ -91,8 +95,63 @@ typedef struct token
   char str[32];
 } Token;
 
-static Token tokens[32] __attribute__((used)) = {};
+static Token tokens[MAX_TOKEN_NUM] __attribute__((used)) = {};
 static int nr_token __attribute__((used)) = 0;
+
+static void print_tokens(Token token)
+{
+  switch (token.type)
+  {
+  case TK_DECIMAL:
+  case TK_HEXADECIMAL:
+  case TK_REG:
+    printf("%s", token.str);
+    break;
+  case TK_DEREF:
+    printf("*");
+    break;
+  case TK_NEG:
+    printf("-");
+    break;
+  case TK_EQ:
+    printf("==");
+    break;
+  case TK_NE:
+    printf("!=");
+    break;
+  case TK_AND:
+    printf("&&");
+    break;
+  default:
+    printf("%c", token.type);
+    break;
+  }
+}
+
+// Return the priority of the operator, the highest is MAX_PRIORITY
+static int get_priority(int type)
+{
+  switch (type)
+  {
+  case TK_DEREF:
+  case TK_NEG:
+    return MAX_PRIORITY;
+  case '*':
+  case '/':
+    return MAX_PRIORITY - 1;
+  case '+':
+  case '-':
+    return MAX_PRIORITY - 2;
+  case TK_EQ:
+  case TK_NE:
+    return MAX_PRIORITY - 3;
+  case TK_AND:
+    return MAX_PRIORITY - 4;
+  default:
+    // Not a real operator, return MAX_PRIORITY + 1 to indicate it
+    return MAX_PRIORITY + 1;
+  }
+}
 
 static bool make_token(char *e)
 {
@@ -102,8 +161,9 @@ static bool make_token(char *e)
 
   nr_token = 0;
 
-  while (e[position] != '\0')
+  while (e[position] != '\0' && e[position] != '\n')
   {
+    Assert(nr_token < MAX_TOKEN_NUM, "Too many tokens");
     /* Try all rules one by one. */
     for (i = 0; i < NR_REGEX; i++)
     {
@@ -161,7 +221,6 @@ static bool make_token(char *e)
           nr_token++;
           break;
         }
-
         break;
       }
     }
@@ -172,34 +231,23 @@ static bool make_token(char *e)
       // debug
       for (int i = 0; i < nr_token; i++)
       {
-        switch (tokens[i].type)
-        {
-        case TK_DECIMAL:
-        case TK_HEXADECIMAL:
-        case TK_REG:
-          printf("%s", tokens[i].str);
-          break;
-        case TK_DEREF:
-          printf("*");
-          break;
-        case TK_NEG:
-          printf("-");
-          break;
-        case TK_EQ:
-          printf("==");
-          break;
-        default:
-          printf("%c", tokens[i].type);
-          break;
-        }
+        print_tokens(tokens[i]);
+        printf(" ");
       }
       return false;
     }
+  }
+  // debug
+  for (int i = 0; i < nr_token; i++)
+  {
+    print_tokens(tokens[i]);
+    printf(" ");
   }
 
   return true;
 }
 
+// check if  the whole expression is in parentheses
 static int check_parentheses(int start, int end)
 {
   if (tokens[start].type != '(' || tokens[end].type != ')')
@@ -213,28 +261,54 @@ static int check_parentheses(int start, int end)
       balance++;
     else if (tokens[i].type == ')')
     {
-      balance = balance - 1;
+      balance--;
       if (balance == 0)
       {
         return 0;
       }
     }
   }
-  return balance > 0;
+  return balance == 1;
 }
 
 word_t eval(int start, int end)
 {
+  //debug
+  printf("eval: ");
+  for (int i = start; i <= end; i++)
+  {
+    print_tokens(tokens[i]);
+  }
+  printf("\n");
   if (start > end)
   {
     return 0;
   }
 
-  if (start == end)
+  if (start == end) // eval a simple token
   {
-    Assert(tokens[start].type == TK_DECIMAL || tokens[start].type == TK_HEXADECIMAL,
-           "Invalid token type: %d", tokens[start].type);
-    return strtol(tokens[start].str, NULL, 0);
+    if (tokens[start].type == TK_DECIMAL || tokens[start].type == TK_HEXADECIMAL)
+    {
+      return strtol(tokens[start].str, NULL, 0);
+    }
+    else if (tokens[start].type == TK_REG)
+    {
+      bool success = false;
+      int result = isa_reg_str2val(tokens[start].str + 1, &success); // remove the '$'
+      if (success)
+      {
+        return result;
+      }
+      else
+      {
+        Assert(0, "Invalid register name: %s", tokens[start].str);
+      }
+    }
+    else
+    {
+      print_tokens(tokens[start]);
+      Assert(0, "Invalid token type");
+    }
   }
 
   if (check_parentheses(start, end))
@@ -242,30 +316,13 @@ word_t eval(int start, int end)
     return eval(start + 1, end - 1);
   }
   int op = -1;
-  int op_priority = 4;
+  int op_priority = MAX_PRIORITY + 1;
   int balance = 0;
 
   // Find the main operator
   for (int i = start; i <= end; i++)
   {
-    if (tokens[i].type == '+' || tokens[i].type == '-')
-    {
-      if (op_priority >= 1)
-      {
-        op = i;
-        op_priority = 1;
-      }
-    }
-    else if (tokens[i].type == '*' || tokens[i].type == '/')
-    {
-      if (op_priority >= 2)
-      {
-        op = i;
-        op_priority = 2;
-      }
-    }
-    else if 
-    else if (tokens[i].type == '(')
+    if (tokens[i].type == '(')
     {
       balance++;
       do
@@ -276,36 +333,70 @@ word_t eval(int start, int end)
         else if (tokens[i].type == ')')
           balance--;
       } while (balance > 0 && i <= end);
+      Assert(balance == 0, "Unmatched parenthesis,start = %d, end = %d", start, end);
     }
     else if (tokens[i].type == ')')
     {
       Assert(0, "Unmatched parenthesis,start = %d, end = %d", start, end);
     }
+    else
+    {
+      int priority = get_priority(tokens[i].type);
+      if (priority <= op_priority)
+      {
+        op = i;
+        op_priority = priority;
+      }
+    }
   }
   Assert(op != -1, "No operator found in expression,start = %d, end = %d", start, end);
-  int val1 = eval(start, op - 1);
-  int val2 = eval(op + 1, end);
 
-  switch (tokens[op].type)
+  // eval by the main operator
+  if (tokens[op].type == TK_DEREF)
   {
-  case '+':
-    return val1 + val2;
-  case '-':
-    return val1 - val2;
-  case '*':
-    return val1 * val2;
-  case '/':
-    Assert(val2 != 0, "Division by zero,start = %d, end = %d,val1 = %d, val2 = %d", start, end, val1, val2);
-    return val1 / val2;
-  default:
-    assert(0);
+    Assert(op == start, "Invalid dereference operator,start = %d, end = %d", start, end);
+    return vaddr_read(eval(start, op - 1), 4);
+  }
+  else if (tokens[op].type == TK_NEG)
+  {
+    Assert(op == start, "Invalid negation operator,start = %d, end = %d", start, end);
+    return -eval(op + 1, end);
+  }
+  else//binary operator
+  {
+    int val1 = eval(start, op - 1);
+    int val2 = eval(op + 1, end);
+
+    switch (tokens[op].type)
+    {
+    case '+':
+      return val1 + val2;
+    case '-':
+      return val1 - val2;
+    case '*':
+      return val1 * val2;
+    case '/':
+      Assert(val2 != 0, "Division by zero,start = %d, end = %d,val1 = %d, val2 = %d", start, end, val1, val2);
+      return val1 / val2;
+    case TK_EQ:
+      return val1 == val2;
+    case TK_NE:
+      return val1 != val2;
+    case TK_AND:
+      return val1 && val2;
+    default:
+      Assert(0, "Invalid operator type,start = %d, end = %d", start, end);
+    }
   }
 }
 
 word_t expr(char *e, bool *success)
 {
-  make_token(e);
-
+  if(!make_token(e))
+  {
+    *success = false;
+    return 0;
+  }
   /* TODO: Insert codes to evaluate the expression. */
   word_t result = eval(0, nr_token - 1);
   *success = true;

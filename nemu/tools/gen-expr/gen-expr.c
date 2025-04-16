@@ -57,7 +57,7 @@ static void gen_op()
 static void gen_num() {
   int num = RANDNUM(1000000);
   char num_buf[16];
-  sprintf(num_buf, "%d", num);
+  sprintf(num_buf, "%c%d",RANDNUM(2)?'-':' ',num);
   strcat(buf, num_buf);
 }
 
@@ -74,18 +74,19 @@ static void gen_expr(int depth, int parenthesis) {
     return;
   }
   gen_space();
-  int seed = RANDNUM(3-parenthesis);
+  int seed = RANDNUM(4-parenthesis);
   switch (seed) 
   {
     case 0:
+    case 1:
       gen_num();
       break;
-    case 1:
+    case 2:
       gen_expr(depth + 1,0);
       gen_op();
       gen_expr(depth + 1,0);
       break;
-    case 2:
+    case 3:
       strcat(buf, "(");
       gen_expr(depth + 1,1);
       strcat(buf, ")");
