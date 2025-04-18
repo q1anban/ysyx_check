@@ -62,7 +62,7 @@ static struct rule
     {"==", TK_EQ},                         // equal
     {"!=", TK_NE},
     {"&&", TK_AND},
-    {"$[a-zA-Z_][a-zA-Z0-9_]*", TK_REG}, // register"}
+    {"\\$[a-zA-Z_][a-zA-Z0-9_]*", TK_REG}, // register
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -229,21 +229,24 @@ static bool make_token(char *e)
     {
       printf("no match at position %d\n%s\n%*.s^\n", position, e, position, "");
       // debug
+
       for (int i = 0; i < nr_token; i++)
       {
         print_tokens(tokens[i]);
         printf(" ");
       }
+
       return false;
     }
   }
+#ifdef DEBUG
   // debug
   for (int i = 0; i < nr_token; i++)
   {
     print_tokens(tokens[i]);
     printf(" ");
   }
-
+#endif
   return true;
 }
 
@@ -274,16 +277,15 @@ static int check_parentheses(int start, int end)
 word_t eval(int start, int end)
 {
   //debug
+#ifdef DEBUG
   printf("eval: ");
   for (int i = start; i <= end; i++)
   {
     print_tokens(tokens[i]);
   }
+#endif
   printf("\n");
-  if (start > end)
-  {
-    return 0;
-  }
+  Assert(start <= end, "Invalid expression,start = %d, end = %d", start, end);
 
   if (start == end) // eval a simple token
   {
@@ -295,6 +297,10 @@ word_t eval(int start, int end)
     {
       bool success = false;
       int result = isa_reg_str2val(tokens[start].str + 1, &success); // remove the '$'
+      //debug
+#ifdef DEBUG
+      printf("%s ",tokens[start].str + 1);
+#endif
       if (success)
       {
         return result;

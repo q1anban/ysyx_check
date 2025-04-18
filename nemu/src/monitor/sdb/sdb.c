@@ -63,21 +63,13 @@ static int cmd_w(char *args)
   // find a unique ID
   for (int i = 0;; i++)
   {
-    WP *p = get_head_wp();
-    for (; p != NULL; p = p->next)
-    {
-      if (p->NO == i)
-      {
-        break;
-      }
-    }
+    WP *p = get_wp_by_no(i);
     if (p == NULL)
     {
       wp->NO = i;
       break;
     }
   }
-
   strncpy(wp->expr, args, 63);
   wp->expr[63] = '\0';
   bool success = false;
@@ -91,6 +83,25 @@ static int cmd_q(char *args)
 {
   nemu_state.state = NEMU_QUIT;
   return -1;
+}
+
+static int cmd_d(char *args)
+{
+  int n;
+  if (sscanf(args, "%d", &n) != 1)
+  {
+    printf("Invalid argument: %s\n", args);
+    return 1;
+  }
+  WP *wp = get_wp_by_no(n);
+  if (wp == NULL)
+  {
+    printf("No watchpoint with number %d\n", n);
+    return 1;
+  }
+  free_wp(wp);
+  printf("Watchpoint %d deleted\n", n);
+  return 0;
 }
 
 static int cmd_x(char *args)
@@ -168,7 +179,7 @@ static struct
     {"info", "Show information about registers or watchpoints", cmd_info},
     {"x", "Examine memory", cmd_x},
     {"w", "Add watchpoint", cmd_w},
-
+    {"d", "Delete watchpoint", cmd_d}
     /* TODO: Add more commands */
 
 };

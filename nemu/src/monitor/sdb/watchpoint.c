@@ -14,6 +14,7 @@
 ***************************************************************************************/
 
 #include "sdb.h"
+#include <cpu/cpu.h>
 
 #define NR_WP 32
 
@@ -22,6 +23,17 @@ static WP *head = NULL, *free_ = NULL;
 
 WP* get_head_wp() {
   return head;
+}
+
+WP* get_wp_by_no(int no) {
+  WP* wp = head;
+  while(wp != NULL) {
+    if(wp->NO == no) {
+      return wp;
+    }
+    wp = wp->next;
+  }
+  return NULL;
 }
 
 void init_wp_pool() {
@@ -72,7 +84,17 @@ void free_wp(WP *wp)
 
 void update_wp()
 {
-
-  
+  for(WP* wp = head; wp != NULL; wp = wp->next) {
+    bool success;
+    int new_value = expr(wp->expr, &success);
+    Assert(success,"Error in watchpoint expression: %s\n", wp->expr);
+    
+    if(new_value != wp->value) {
+      printf("Watchpoint %d: %s changed from %d to %d\n", wp->NO, wp->expr, wp->value, new_value);
+      wp->value = new_value;
+      nemu_state.state = NEMU_STOP;
+      break;
+    }
+  }
 }
 

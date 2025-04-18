@@ -20,8 +20,8 @@
 
 word_t expr(char *e, bool *success);
 
-void update_wp();
 
+//watch point
 typedef struct watchpoint
 {
     int NO;
@@ -29,10 +29,16 @@ typedef struct watchpoint
 
     /* TODO: Add more members if necessary */
     char expr[64];
-    int value;
+    char value;
 } WP;
+
 void init_wp_pool();
+
 WP *new_wp();
+
 void free_wp(WP *wp);
+
 WP* get_head_wp();
+
+WP* get_wp_by_no(int no);
 #endif
