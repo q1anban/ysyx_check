@@ -15,6 +15,9 @@ void putch(char ch) {
 }
 
 void halt(int code) {
+  //set the code to the trap register and call ebreak
+  asm volatile ("mv a0, %0" : : "r"(code));
+  asm volatile ("ebreak");
   while (1);
 }
 

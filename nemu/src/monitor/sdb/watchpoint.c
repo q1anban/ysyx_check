@@ -90,7 +90,7 @@ void update_wp()
     Assert(success,"Error in watchpoint expression: %s\n", wp->expr);
     
     if(new_value != wp->value) {
-      printf("Watchpoint %d: %s changed from %d to %d\n", wp->NO, wp->expr, wp->value, new_value);
+      printf("Watchpoint %d: %s changed from %d (%x) to %d (%x)\n", wp->NO, wp->expr, wp->value, wp->value,new_value,new_value);
       wp->value = new_value;
       nemu_state.state = NEMU_STOP;
       break;
